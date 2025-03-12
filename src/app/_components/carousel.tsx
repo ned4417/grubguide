@@ -128,8 +128,8 @@ const Modal = memo(({ isOpen, onClose, children, currentIndex, totalItems, onPre
         {children}
       </div>
       
-      {/* Thumbnail strip */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-2 px-4 overflow-x-auto pb-2 z-10">
+      {/* Thumbnail strip - smaller on mobile */}
+      <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-1 sm:gap-2 px-4 overflow-x-auto pb-2 z-10">
         {photos.map((photo, idx) => (
           <button
             key={idx}
@@ -139,9 +139,9 @@ const Modal = memo(({ isOpen, onClose, children, currentIndex, totalItems, onPre
                 setCurrentIndex(idx);
               }
             }}
-            className={`relative h-16 w-24 rounded-md overflow-hidden transition-all duration-300 ${
+            className={`relative h-12 sm:h-16 w-16 sm:w-24 rounded-md overflow-hidden transition-all duration-300 ${
               idx === currentIndex 
-                ? 'ring-2 ring-accent scale-110' 
+                ? 'ring-1 sm:ring-2 ring-accent scale-110' 
                 : 'opacity-60 hover:opacity-100'
             }`}
             aria-label={`View image ${idx + 1}`}
@@ -151,7 +151,7 @@ const Modal = memo(({ isOpen, onClose, children, currentIndex, totalItems, onPre
               alt={`Thumbnail ${idx + 1}`}
               fill
               className="object-cover"
-              sizes="96px"
+              sizes="(max-width: 640px) 64px, 96px"
             />
           </button>
         ))}
@@ -223,34 +223,115 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
     setIsModalOpen(true);
   };
 
-  // Handle touch events for swipe functionality
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchEndX.current = null;
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    if (touchStartX.current === null || touchEndX.current === null) return;
+  // Enhanced touch events for better swipe functionality
+  const touchStartY = useRef<number | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const modalContentRef = useRef<HTMLDivElement>(null);
+  
+  // Helper function to create touch event handlers
+  const setupTouchHandlers = useCallback((element: HTMLElement | null) => {
+    if (!element) return () => {};
     
-    const swipeDistance = touchEndX.current - touchStartX.current;
-    const minSwipeDistance = 50; // Minimum distance to register as a swipe
+    const handleTouchStart = (e: TouchEvent) => {
+      // Store both X and Y coordinates to detect vertical scrolling
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      touchEndX.current = null;
+      setIsSwiping(true);
+      setSwipeDirection(null);
+      setSwipeProgress(0);
+      setShowSwipeHint(false); // Hide hint on first touch
+    };
     
-    if (swipeDistance > minSwipeDistance) {
-      // Swiped right, go to previous slide
-      prevSlide();
-    } else if (swipeDistance < -minSwipeDistance) {
-      // Swiped left, go to next slide
-      nextSlide();
-    }
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartX.current === null || touchStartY.current === null) return;
+      
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      
+      // Calculate horizontal and vertical distance
+      const horizontalDistance = currentX - touchStartX.current;
+      const verticalDistance = Math.abs(currentY - touchStartY.current);
+      
+      // If vertical scrolling is more significant, don't handle as a swipe
+      if (verticalDistance > Math.abs(horizontalDistance) * 1.2) {
+        touchStartX.current = null;
+        touchStartY.current = null;
+        setIsSwiping(false);
+        return;
+      }
+      
+      // Only prevent default for horizontal swipes to allow vertical scrolling
+      if (Math.abs(horizontalDistance) > 10) {
+        e.preventDefault();
+      }
+      
+      // Update swipe direction and progress for visual feedback
+      if (horizontalDistance > 0) {
+        setSwipeDirection('right');
+        setSwipeProgress(Math.min(horizontalDistance / 100, 1));
+      } else {
+        setSwipeDirection('left');
+        setSwipeProgress(Math.min(Math.abs(horizontalDistance) / 100, 1));
+      }
+      
+      touchEndX.current = currentX;
+    };
     
-    // Reset touch coordinates
-    touchStartX.current = null;
-    touchEndX.current = null;
+    const handleTouchEnd = () => {
+      if (touchStartX.current === null || touchEndX.current === null) {
+        setIsSwiping(false);
+        return;
+      }
+      
+      const swipeDistance = touchEndX.current - touchStartX.current;
+      const minSwipeDistance = 30; // Reduced minimum distance for better responsiveness
+      
+      if (swipeDistance > minSwipeDistance) {
+        // Swiped right, go to previous slide
+        prevSlide();
+      } else if (swipeDistance < -minSwipeDistance) {
+        // Swiped left, go to next slide
+        nextSlide();
+      }
+      
+      // Reset touch coordinates and swipe state
+      touchStartX.current = null;
+      touchStartY.current = null;
+      touchEndX.current = null;
+      setIsSwiping(false);
+      setSwipeDirection(null);
+      setSwipeProgress(0);
+    };
+    
+    // Add event listeners with passive: false for touchmove
+    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    element.addEventListener('touchend', handleTouchEnd, { passive: true });
+    
+    // Return cleanup function
+    return () => {
+      element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('touchend', handleTouchEnd);
+    };
   }, [nextSlide, prevSlide]);
+  
+  // Setup touch handlers for main carousel
+  useEffect(() => {
+    const cleanup = setupTouchHandlers(carouselRef.current);
+    return cleanup;
+  }, [setupTouchHandlers]);
+  
+  // Setup touch handlers for modal content
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const cleanup = setupTouchHandlers(modalContentRef.current);
+    return cleanup;
+  }, [isModalOpen, setupTouchHandlers]);
 
   // Auto-advance slides every 5 seconds if not in modal view
   useEffect(() => {
@@ -290,6 +371,20 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
   // Get the current photo
   const currentPhoto = photos[currentIndex];
   const [imageError, setImageError] = useState(false);
+  
+  // Swipe hint for mobile
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
+  
+  // Show swipe hint on first load, then hide after a few seconds
+  useEffect(() => {
+    if (showSwipeHint) {
+      const timer = setTimeout(() => {
+        setShowSwipeHint(false);
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [showSwipeHint]);
 
   return (
     <div 
@@ -298,12 +393,35 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
     >
       {/* Main Image */}
       <div 
+        ref={carouselRef}
         className="relative w-full h-full cursor-pointer"
         onClick={openModal}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
+        {/* Initial swipe hint animation for mobile - only shown on first load */}
+        {showSwipeHint && (
+          <div className="absolute inset-0 z-20 pointer-events-none sm:hidden">
+            <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-accent/30 to-transparent flex items-center justify-start pl-2 animate-pulse">
+              <ChevronLeftIcon className="w-8 h-8 text-white" />
+            </div>
+            <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-accent/30 to-transparent flex items-center justify-end pr-2 animate-pulse">
+              <ChevronRightIcon className="w-8 h-8 text-white" />
+            </div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white text-xs bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-sm">
+              Swipe to navigate
+            </div>
+          </div>
+        )}
+        {/* Swipe indicators - only visible during swipe */}
+        {isSwiping && swipeDirection === 'left' && (
+          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-accent/30 to-transparent z-10 flex items-center justify-end pr-2">
+            <ChevronRightIcon className="w-8 h-8 text-white animate-pulse" style={{ opacity: swipeProgress }} />
+          </div>
+        )}
+        {isSwiping && swipeDirection === 'right' && (
+          <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-accent/30 to-transparent z-10 flex items-center justify-start pl-2">
+            <ChevronLeftIcon className="w-8 h-8 text-white animate-pulse" style={{ opacity: swipeProgress }} />
+          </div>
+        )}
         <Image
           src={imageError ? `/fallback-${(currentIndex % 8) + 1}.jpg`.replace('fallback-1.jpg', 'breakfast.jpg')
                            .replace('fallback-2.jpg', 'burger.jpg')
@@ -349,8 +467,8 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
         <ChevronRightIcon className="w-5 h-5 sm:w-6 sm:h-6" />
       </button>
 
-      {/* Indicator Pills */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+      {/* Indicator Pills - smaller on mobile */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-1 sm:space-x-2 z-10">
         {photos.map((_, index) => (
           <button
             key={index}
@@ -360,8 +478,8 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
             }}
             className={`transition-all duration-300 ease-in-out rounded-full ${
               index === currentIndex 
-                ? 'w-8 h-2 bg-accent' 
-                : 'w-2 h-2 bg-white/50 hover:bg-white/80'
+                ? 'w-5 sm:w-8 h-1.5 sm:h-2 bg-accent' 
+                : 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-white/50 hover:bg-white/80'
             }`}
             aria-label={`Go to image ${index + 1}`}
             aria-current={index === currentIndex ? 'true' : 'false'}
@@ -390,10 +508,8 @@ const ImageCarousel = memo(({ photos }: CarouselProps) => {
         setCurrentIndex={setCurrentIndex}
       >
         <div 
+          ref={modalContentRef}
           className="relative w-full max-w-6xl h-full max-h-[90vh]"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
         >
           <ModalImage 
             src={photos[currentIndex]} 

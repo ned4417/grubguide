@@ -248,7 +248,7 @@ const Home: React.FC = () => {
       </div>
 
       {/* Action button section */}
-      <div className="mb-8">
+      <div className="w-full flex justify-center mb-6">
         {selectedAddress && randomRestaurant && (
           <button 
             className="btn btn-primary btn-lg shadow-lg" 
@@ -257,7 +257,7 @@ const Home: React.FC = () => {
             Roll the culinary dice again
           </button>
         )}
-      </div>      
+      </div>
     </main>
   );
 };
