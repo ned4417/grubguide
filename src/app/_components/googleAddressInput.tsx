@@ -14,22 +14,24 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
   const inputRef = useRef<HTMLInputElement>(null);
   const predictionsRef = useRef<HTMLDivElement>(null);
 
-  // Close predictions when clicking outside
+  // Close predictions when clicking or touching outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
       if (
-        predictionsRef.current && 
+        predictionsRef.current &&
         !predictionsRef.current.contains(event.target as Node) &&
-        inputRef.current && 
+        inputRef.current &&
         !inputRef.current.contains(event.target as Node)
       ) {
         setPredictions([]);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
     };
   }, []);
 
@@ -63,6 +65,7 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           ref={inputRef}
           className="input input-bordered w-full shadow-sm focus:ring-2 focus:ring-accent focus:border-accent transition-all duration-200"
           type="text"
+          autoComplete="off"
           value={autocompleteInput}
           onChange={handleInputChange}
           onFocus={() => setIsFocused(true)}
@@ -70,8 +73,8 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           aria-label="Location search"
         />
         {autocompleteInput && (
-          <button 
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          <button
+            className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-200 min-w-[44px]"
             onClick={() => {
               setAutocompleteInput('');
               setPredictions([]);
@@ -83,20 +86,28 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           </button>
         )}
       </div>
-      
+
       {predictions.length > 0 && (
-        <div 
+        <div
           ref={predictionsRef}
           className="absolute z-10 mt-1 w-full bg-base-100 shadow-lg rounded-md border border-base-300 max-h-60 overflow-y-auto"
         >
           {predictions.map((prediction) => (
-            <div 
-              className="py-2 px-3 cursor-pointer hover:bg-base-200 text-sm border-b border-base-200 last:border-b-0" 
-              key={prediction.place_id} 
-              onClick={() => handleSelectSuggestion(prediction)}
+            <button
+              key={prediction.place_id}
+              className="w-full text-left py-3 px-4 cursor-pointer hover:bg-base-200 active:bg-base-300 text-sm border-b border-base-200 last:border-b-0 min-h-[44px]"
+              onMouseDown={(e) => {
+                // Use onMouseDown so it fires before the input's onBlur clears predictions
+                e.preventDefault();
+                handleSelectSuggestion(prediction);
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleSelectSuggestion(prediction);
+              }}
             >
               {prediction.description}
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -27,6 +27,7 @@ const Home: React.FC = () => {
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const autocompleteRef = useRef<HTMLInputElement>(null);
+  const restaurantCardRef = useRef<HTMLDivElement>(null);
   const [currentPhotos, setCurrentPhotos] = useState<string[]>([
     breakfast.src,
     burger.src,
@@ -59,13 +60,20 @@ const Home: React.FC = () => {
     }
   }, [randomRestaurant]);
 
+  // Scroll restaurant card into view when a result loads
+  useEffect(() => {
+    if (randomRestaurant && restaurantCardRef.current) {
+      restaurantCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [randomRestaurant]);
+
   // Function to fetch and set random restaurant data
   const fetchRandomRestaurant = (address: string, radius: string, isReroll: boolean = false, previousId?: string) => {
     setIsLoading(true);
     setRandomRestaurant(null);
-    
+
     let url = `/api/getRestaurants?address=${encodeURIComponent(address)}&radius=${radius}`;
-    
+
     // Add reroll and previousId parameters if this is a reroll
     if (isReroll) {
       url += `&reroll=true`;
@@ -73,7 +81,7 @@ const Home: React.FC = () => {
         url += `&previousId=${previousId}`;
       }
     }
-    
+
     axios.get(url)
       .then(response => {
         setRandomRestaurant(response.data); // Set randomRestaurant state with fetched data
@@ -90,13 +98,13 @@ const Home: React.FC = () => {
   const handleGetCurrentLocation = () => {
     setIsGettingLocation(true);
     setLocationError(null);
-    
+
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser");
       setIsGettingLocation(false);
       return;
     }
-    
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -104,7 +112,7 @@ const Home: React.FC = () => {
           const response = await axios.get(
             `/api/reverseGeocode?lat=${position.coords.latitude}&lng=${position.coords.longitude}`
           );
-          
+
           if (response.data && response.data.address) {
             const address = response.data.address;
             setSelectedAddress(address);
@@ -123,7 +131,7 @@ const Home: React.FC = () => {
       (error) => {
         console.error("Geolocation error:", error);
         setLocationError(
-          error.code === 1 
+          error.code === 1
             ? "Location access denied. Please enable location services."
             : "Error getting your location"
         );
@@ -151,13 +159,13 @@ const Home: React.FC = () => {
   }
 
   return (
-    <main data-theme="dark" className="flex min-h-screen flex-col items-center justify-between p-4 sm:p-8 md:p-12 lg:p-16">
+    <main data-theme="dark" className="flex min-h-screen flex-col items-center py-6 px-4 sm:px-8 md:px-12 lg:px-16 gap-6">
       {/* Header with logo */}
-      <div className="z-10 w-full max-w-5xl items-center justify-center font-mono text-sm mb-6 md:mb-8">
-        <Image 
-          src={grubGuideLogo} 
-          alt="Grub Guide Logo" 
-          className="w-full max-w-md mx-auto"
+      <div className="z-10 w-full max-w-5xl flex items-center justify-center font-mono text-sm">
+        <Image
+          src={grubGuideLogo}
+          alt="Grub Guide Logo"
+          className="w-full max-w-[180px] sm:max-w-xs md:max-w-md mx-auto"
           priority
           width={800}
           height={200}
@@ -166,50 +174,62 @@ const Home: React.FC = () => {
       </div>
 
       {/* Search section */}
-      <div className="w-full max-w-xl px-2 space-y-4 mb-6">
+      <div className="w-full max-w-xl px-2 space-y-4">
         <div className="w-full">
           <label className="label text-sm font-medium mb-1">Enter an address or use your location</label>
-          <div className="flex w-full gap-2">
+          <div className="flex w-full gap-2 items-start">
             <div className="flex-grow">
-              <GoogleAddressAutocomplete 
-                onSelect={handleSelectPlace} 
-                setSelectedAddress={setSelectedAddress} 
-                radius={selectedDistance} 
+              <GoogleAddressAutocomplete
+                onSelect={handleSelectPlace}
+                setSelectedAddress={setSelectedAddress}
+                radius={selectedDistance}
               />
             </div>
-            <button 
-              className="btn btn-outline border-2 border-accent hover:bg-accent/20 tooltip tooltip-left"
-              data-tip="Use my current location"
-              onClick={handleGetCurrentLocation}
-              disabled={isGettingLocation}
-              aria-label="Use my current location"
-            >
-              {isGettingLocation ? (
-                <span className="loading loading-spinner loading-sm"></span>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                </svg>
-              )}
-            </button>
+            {/* Location button — flex-col so a label can appear under it on mobile */}
+            <div className="flex flex-col items-center gap-0.5 shrink-0">
+              <button
+                className="btn btn-outline border-2 border-accent hover:bg-accent/20"
+                onClick={handleGetCurrentLocation}
+                disabled={isGettingLocation}
+                aria-label="Use my current location"
+              >
+                {isGettingLocation ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+              {/* Visible label on mobile instead of hover tooltip */}
+              <span className="text-[10px] text-accent/80 leading-none sm:hidden">My location</span>
+            </div>
           </div>
         </div>
-        
+
         {locationError && (
-          <div className="text-error text-sm mt-1">{locationError}</div>
+          <div className="flex items-center gap-2 text-error text-sm mt-1">
+            <span>{locationError}</span>
+            <button
+              className="btn btn-xs btn-ghost text-error underline"
+              onClick={handleGetCurrentLocation}
+            >
+              Retry
+            </button>
+          </div>
         )}
 
         <div className="w-full">
           <label className="label text-sm md:text-base">
             {searchLabelText} <span className="font-medium">{selectedDistance} mi</span>
           </label>
-          <input 
-            type="range" 
-            min={5} 
-            max="30" 
-            value={selectedDistance} 
-            className="range range-accent w-full" 
-            onChange={handleSliderOnChange} 
+          <input
+            type="range"
+            min={5}
+            max="30"
+            value={selectedDistance}
+            className="range range-accent w-full"
+            onChange={handleSliderOnChange}
           />
           <div className="w-full flex justify-between text-xs px-1 mt-1">
             <span>5 mi</span>
@@ -228,14 +248,14 @@ const Home: React.FC = () => {
             </div>
           </div>
         ) : randomRestaurant ? (
-          <div className="p-3 sm:p-4 md:p-6 text-center bg-base-200 rounded-lg shadow-md mb-6 animate-fade-in">
-            <h2 className="text-xl sm:text-2xl md:text-3xl mb-2 font-bold">{randomRestaurant.name}</h2>
-            <p className="text-sm sm:text-base md:text-lg mb-1">{randomRestaurant.formatted_address}</p>
+          <div ref={restaurantCardRef} className="p-3 sm:p-4 md:p-6 text-center bg-base-200 rounded-lg shadow-md animate-fade-in">
+            <h2 className="text-xl sm:text-2xl md:text-3xl mb-2 font-bold break-words">{randomRestaurant.name}</h2>
+            <p className="text-sm sm:text-base md:text-lg mb-1 break-words">{randomRestaurant.formatted_address}</p>
             <p className="text-xs sm:text-sm md:text-base pt-2 opacity-80">
               {distanceLabelText} <span className="font-medium">{randomRestaurant.distance}</span>
             </p>
           </div>
-        ) : selectedAddress ? (
+        ) : selectedAddress && !isLoading ? (
           <div className="p-3 text-center opacity-70">
             <p>Select a location to find restaurants</p>
           </div>
@@ -243,21 +263,29 @@ const Home: React.FC = () => {
       </div>
 
       {/* Carousel section */}
-      <div className="w-full max-w-4xl mx-auto aspect-square sm:aspect-[4/3] lg:aspect-[16/9] mb-6">
+      <div className="w-full max-w-4xl mx-auto aspect-[4/3] lg:aspect-[16/9] max-h-[45vh] lg:max-h-none">
         <ImageCarousel photos={currentPhotos} />
       </div>
 
-      {/* Action button section */}
-      <div className="w-full flex justify-center mb-6">
-        {selectedAddress && randomRestaurant && (
-          <button 
-            className="btn btn-primary btn-lg shadow-lg" 
+      {/* Action button section — always rendered when address is selected so users know it exists */}
+      {selectedAddress && (
+        <div className="w-full flex justify-center">
+          <button
+            className="btn btn-primary btn-lg shadow-lg"
             onClick={chooseAnotherRestaurant}
+            disabled={!randomRestaurant || isLoading}
           >
-            Roll the culinary dice again
+            {isLoading ? (
+              <>
+                <span className="loading loading-spinner loading-sm"></span>
+                Finding a spot…
+              </>
+            ) : (
+              'Roll the culinary dice again'
+            )}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 };
