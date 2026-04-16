@@ -97,14 +97,10 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
               key={prediction.place_id}
               className="w-full text-left py-3 px-4 cursor-pointer hover:bg-base-200 active:bg-base-300 text-sm border-b border-base-200 last:border-b-0 min-h-[44px]"
               onMouseDown={(e) => {
-                // Use onMouseDown so it fires before the input's onBlur clears predictions
+                // Prevent the input from losing focus so predictions stay visible until onClick fires
                 e.preventDefault();
-                handleSelectSuggestion(prediction);
               }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                handleSelectSuggestion(prediction);
-              }}
+              onClick={() => handleSelectSuggestion(prediction)}
             >
               {prediction.description}
             </button>
