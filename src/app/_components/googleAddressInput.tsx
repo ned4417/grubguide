@@ -1,5 +1,5 @@
 // components/GoogleAddressAutocomplete.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 interface GoogleAddressAutocompleteProps {
   onSelect: (place: google.maps.places.AutocompletePrediction) => void;
@@ -11,8 +11,28 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
   const [autocompleteInput, setAutocompleteInput] = useState('');
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [isApiReady, setIsApiReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const predictionsRef = useRef<HTMLDivElement>(null);
+
+  // Poll until google.maps.places is available (script loads async)
+  useEffect(() => {
+    const check = () => {
+      if ((window as any).google?.maps?.places) {
+        setIsApiReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (check()) return; // Already loaded
+
+    const interval = setInterval(() => {
+      if (check()) clearInterval(interval);
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Close predictions when clicking or touching outside
   useEffect(() => {
@@ -36,24 +56,41 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
   }, []);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setAutocompleteInput(event.target.value);
-    if (event.target.value) {
+    const value = event.target.value;
+    setAutocompleteInput(value);
+
+    if (!value) {
+      setPredictions([]);
+      return;
+    }
+
+    if (!isApiReady) {
+      console.error('Google Maps Places API is not ready yet.');
+      return;
+    }
+
+    try {
       const autocompleteService = new google.maps.places.AutocompleteService();
-      autocompleteService.getPlacePredictions({ input: event.target.value }, (predictions, status) => {
-        if (status === 'OK' && predictions) {
-          setPredictions(predictions);
+      autocompleteService.getPlacePredictions({ input: value }, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+          setPredictions(results);
+        } else {
+          setPredictions([]);
+          if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+            console.error('Places autocomplete failed:', status);
+          }
         }
       });
-    } else {
-      setPredictions([]);
+    } catch (err) {
+      console.error('AutocompleteService error:', err);
     }
   };
 
   // Handle the selection of a suggestion
   const handleSelectSuggestion = (suggestion: google.maps.places.AutocompletePrediction) => {
     setAutocompleteInput(suggestion.description);
-    setSelectedAddress(suggestion.description); // Set the selected address in page.tsx state
-    onSelect(suggestion); // Pass the selected suggestion back to page.tsx
+    setSelectedAddress(suggestion.description);
+    onSelect(suggestion);
     setPredictions([]);
     setIsFocused(false);
   };
@@ -69,7 +106,8 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           value={autocompleteInput}
           onChange={handleInputChange}
           onFocus={() => setIsFocused(true)}
-          placeholder="Enter a location"
+          placeholder={isApiReady ? "Enter a location" : "Loading maps…"}
+          disabled={!isApiReady}
           aria-label="Location search"
         />
         {autocompleteInput && (

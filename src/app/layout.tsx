@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"
@@ -74,19 +75,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-          {/* Load the Google Maps JavaScript API script with your API key */}
-          <script
-            src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`}
-            async
-            defer
-          ></script>
-        </head>
       <body className={inter.className}>
         {children}
         <Analytics />
         <SpeedInsights />
-        
+        {/* Load Google Maps JS API after the page is interactive.
+            The autocomplete component polls for window.google readiness. */}
+        <Script
+          src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`}
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
