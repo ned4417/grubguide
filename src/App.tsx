@@ -1,42 +1,27 @@
-"use client"; // This is a client component 👈🏽
 import { useState, useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
 import { useMediaQuery } from 'react-responsive';
-import GoogleAddressAutocomplete from './_components/googleAddressInput';
+import GoogleAddressAutocomplete from './components/GoogleAddressInput';
 import axios from 'axios';
-import ImageCarousel from './_components/carousel';
+import ImageCarousel from './components/Carousel';
 import "react-multi-carousel/lib/styles.css";
-import Image from 'next/image';
-import grubGuideLogo from '../../public/grubguide_logo_bg-removebg-preview.png';
-import breakfast from '../../public/breakfast.jpg';
-import burger from '../../public/burger.jpg';
-import dessert from '../../public/dessert.jpg';
-import fancy from '../../public/fancy.jpg';
-import tacos from '../../public/tacos.jpg';
-import pizza from '../../public/pizza.jpg';
-import sushi from '../../public/sushi.jpg';
-import pasta from '../../public/pasta.jpg';
 
-const Home: React.FC = () => {
-  const [randomRestaurant, setRandomRestaurant] = useState<any>(null); // Adjust the type according to your API response
+const App: React.FC = () => {
+  const [randomRestaurant, setRandomRestaurant] = useState<any>(null);
   const [selectedAddress, setSelectedAddress] = useState<string>('');
   const [selectedDistance, setSelectedDistance] = useState<string>('10');
-  const [originLat, setOriginLat] = useState<string>('');
-  const [originLon, setOriginLon] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const autocompleteRef = useRef<HTMLInputElement>(null);
   const restaurantCardRef = useRef<HTMLDivElement>(null);
   const [currentPhotos, setCurrentPhotos] = useState<string[]>([
-    breakfast.src,
-    burger.src,
-    dessert.src,
-    fancy.src,
-    tacos.src,
-    pizza.src,
-    sushi.src,
-    pasta.src
+    '/breakfast.jpg',
+    '/burger.jpg',
+    '/dessert.jpg',
+    '/fancy.jpg',
+    '/tacos.jpg',
+    '/pizza.jpg',
+    '/sushi.jpg',
+    '/pasta.jpg'
   ]);
   const [searchLabelText, setSearchLabelText] = useState("Search Radius from Address to search: ");
   const [distanceLabelText, setDistanceLabelText] = useState("Distance from selected address: ");
@@ -84,13 +69,12 @@ const Home: React.FC = () => {
 
     axios.get(url)
       .then(response => {
-        setRandomRestaurant(response.data); // Set randomRestaurant state with fetched data
+        setRandomRestaurant(response.data);
         setIsLoading(false);
       })
       .catch(error => {
         console.error('Error fetching restaurant:', error);
         setIsLoading(false);
-        // Handle error
       });
   };
 
@@ -108,7 +92,6 @@ const Home: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          // Use our server-side API endpoint for reverse geocoding
           const response = await axios.get(
             `/api/reverseGeocode?lat=${position.coords.latitude}&lng=${position.coords.longitude}`
           );
@@ -116,7 +99,6 @@ const Home: React.FC = () => {
           if (response.data && response.data.address) {
             const address = response.data.address;
             setSelectedAddress(address);
-            // Fetch restaurants using the obtained address
             fetchRandomRestaurant(address, selectedDistance);
           } else {
             setLocationError("Could not determine your address");
@@ -148,9 +130,8 @@ const Home: React.FC = () => {
 
   // Function to choose another restaurant
   const chooseAnotherRestaurant = () => {
-    // Pass the current restaurant's place_id to exclude it from the next selection
     const previousId = randomRestaurant?.place_id;
-    setRandomRestaurant(null); // Reset randomRestaurant state to trigger a new fetch
+    setRandomRestaurant(null);
     fetchRandomRestaurant(selectedAddress, selectedDistance, true, previousId);
   };
 
@@ -162,14 +143,10 @@ const Home: React.FC = () => {
     <main data-theme="dark" className="flex min-h-screen flex-col items-center py-6 px-4 sm:px-8 md:px-12 lg:px-16 gap-6">
       {/* Header with logo */}
       <div className="z-10 w-full max-w-5xl flex items-center justify-center font-mono text-sm">
-        <Image
-          src={grubGuideLogo}
+        <img
+          src="/grubguide_logo_bg-removebg-preview.png"
           alt="Grub Guide Logo"
           className="w-full max-w-[180px] sm:max-w-xs md:max-w-md mx-auto"
-          priority
-          width={800}
-          height={200}
-          quality={90}
         />
       </div>
 
@@ -185,7 +162,6 @@ const Home: React.FC = () => {
                 radius={selectedDistance}
               />
             </div>
-            {/* Location button — flex-col so a label can appear under it on mobile */}
             <div className="flex flex-col items-center gap-0.5 shrink-0">
               <button
                 className="btn btn-outline border-2 border-accent hover:bg-accent/20"
@@ -201,7 +177,6 @@ const Home: React.FC = () => {
                   </svg>
                 )}
               </button>
-              {/* Visible label on mobile instead of hover tooltip */}
               <span className="text-[10px] text-accent/80 leading-none sm:hidden">My location</span>
             </div>
           </div>
@@ -267,7 +242,7 @@ const Home: React.FC = () => {
         <ImageCarousel photos={currentPhotos} />
       </div>
 
-      {/* Action button section — always rendered when address is selected so users know it exists */}
+      {/* Action button section */}
       {selectedAddress && (
         <div className="w-full flex justify-center">
           <button
@@ -290,4 +265,4 @@ const Home: React.FC = () => {
   );
 };
 
-export default Home;
+export default App;

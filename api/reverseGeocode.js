@@ -1,21 +1,14 @@
-// app/api/reverseGeocode/route.ts
-import { NextResponse } from 'next/server';
+export default async function handler(req, res) {
+    const { lat, lng } = req.query;
 
-export async function GET(request: Request) {
-    const url = new URL(request.url);
-    console.log('Request URL:', url.toString());
-    console.log('Search params:', Object.fromEntries(url.searchParams.entries()));
-
-    const lat = url.searchParams.get('lat');
-    const lng = url.searchParams.get('lng');
-
-    const apiKey = process.env.GOOGLE_API_KEY;
+    // Use server API key for server-side calls (no referrer restrictions)
+    const apiKey = process.env.GOOGLE_SERVER_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
-        return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+        return res.status(500).json({ error: 'API key not configured' });
     }
 
     if (!lat || !lng) {
-        return NextResponse.json({ error: 'Missing required parameters: lat and lng' }, { status: 400 });
+        return res.status(400).json({ error: 'Missing required parameters: lat and lng' });
     }
 
     try {
@@ -29,30 +22,28 @@ export async function GET(request: Request) {
         }
 
         const data = await response.json();
-        console.log('Google Geocoding API response:', JSON.stringify(data, null, 2));
 
         // Check if we got a REQUEST_DENIED error
         if (data.status === 'REQUEST_DENIED') {
             console.log('Geocoding API access denied, using fallback address for testing');
 
             // For testing purposes, generate a location name based on the coordinates
-            // This allows the app to function while the API key issues are being resolved
-            return NextResponse.json({
+            return res.status(200).json({
                 address: `Location at ${lat}, ${lng}`,
                 note: "Using approximate location. API key needs Geocoding API enabled."
             });
         }
 
         if (data.status !== 'OK' || !data.results || data.results.length === 0) {
-            return NextResponse.json({ error: 'No address found for these coordinates' }, { status: 404 });
+            return res.status(404).json({ error: 'No address found for these coordinates' });
         }
 
         // Return the formatted address from the first result
-        return NextResponse.json({
+        return res.status(200).json({
             address: data.results[0].formatted_address
         });
     } catch (error) {
         console.error('Error reverse geocoding:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 }

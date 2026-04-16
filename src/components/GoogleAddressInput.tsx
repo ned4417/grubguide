@@ -1,5 +1,4 @@
-// components/GoogleAddressAutocomplete.tsx
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface GoogleAddressAutocompleteProps {
   onSelect: (place: google.maps.places.AutocompletePrediction) => void;
