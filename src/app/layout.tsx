@@ -80,9 +80,10 @@ export default function RootLayout({
         <Analytics />
         <SpeedInsights />
         {/* Load Google Maps JS API after the page is interactive.
-            The autocomplete component polls for window.google readiness. */}
+            The autocomplete component polls for window.google readiness.
+            Using v=weekly to get the latest Places API updates. */}
         <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`}
+          src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=weekly`}
           strategy="afterInteractive"
         />
       </body>
