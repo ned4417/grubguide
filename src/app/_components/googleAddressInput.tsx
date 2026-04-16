@@ -1,5 +1,5 @@
 // components/GoogleAddressAutocomplete.tsx
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface GoogleAddressAutocompleteProps {
   onSelect: (place: google.maps.places.AutocompletePrediction) => void;
@@ -8,14 +8,12 @@ interface GoogleAddressAutocompleteProps {
 }
 
 const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ onSelect, setSelectedAddress }) => {
-  const [autocompleteInput, setAutocompleteInput] = useState('');
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
-  const [isFocused, setIsFocused] = useState(false);
+  const [inputValue, setInputValue] = useState('');
   const [isApiReady, setIsApiReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const predictionsRef = useRef<HTMLDivElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  // Poll until google.maps.places is available (script loads async)
+  // Poll until window.google.maps.places is available (script loads async)
   useEffect(() => {
     const check = () => {
       if ((window as any).google?.maps?.places) {
@@ -24,76 +22,31 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
       }
       return false;
     };
-
-    if (check()) return; // Already loaded
-
-    const interval = setInterval(() => {
-      if (check()) clearInterval(interval);
-    }, 200);
-
+    if (check()) return;
+    const interval = setInterval(() => { if (check()) clearInterval(interval); }, 200);
     return () => clearInterval(interval);
   }, []);
 
-  // Close predictions when clicking or touching outside
+  // Attach the Autocomplete widget once the API is ready
   useEffect(() => {
-    const handleOutside = (event: MouseEvent | TouchEvent) => {
-      if (
-        predictionsRef.current &&
-        !predictionsRef.current.contains(event.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(event.target as Node)
-      ) {
-        setPredictions([]);
-      }
-    };
+    if (!isApiReady || !inputRef.current || autocompleteRef.current) return;
 
-    document.addEventListener('mousedown', handleOutside);
-    document.addEventListener('touchstart', handleOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleOutside);
-      document.removeEventListener('touchstart', handleOutside);
-    };
-  }, []);
+    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+      fields: ['formatted_address', 'place_id', 'name'],
+    });
+    autocompleteRef.current = autocomplete;
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setAutocompleteInput(value);
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      const address = place.formatted_address || place.name || '';
+      if (!address) return;
 
-    if (!value) {
-      setPredictions([]);
-      return;
-    }
-
-    if (!isApiReady) {
-      console.error('Google Maps Places API is not ready yet.');
-      return;
-    }
-
-    try {
-      const autocompleteService = new google.maps.places.AutocompleteService();
-      autocompleteService.getPlacePredictions({ input: value }, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          setPredictions(results);
-        } else {
-          setPredictions([]);
-          if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-            console.error('Places autocomplete failed:', status);
-          }
-        }
-      });
-    } catch (err) {
-      console.error('AutocompleteService error:', err);
-    }
-  };
-
-  // Handle the selection of a suggestion
-  const handleSelectSuggestion = (suggestion: google.maps.places.AutocompletePrediction) => {
-    setAutocompleteInput(suggestion.description);
-    setSelectedAddress(suggestion.description);
-    onSelect(suggestion);
-    setPredictions([]);
-    setIsFocused(false);
-  };
+      setInputValue(address);
+      setSelectedAddress(address);
+      // Cast to satisfy the existing onSelect signature; page.tsx only uses .description
+      onSelect({ description: address, place_id: place.place_id ?? '' } as google.maps.places.AutocompletePrediction);
+    });
+  }, [isApiReady, onSelect, setSelectedAddress]);
 
   return (
     <div className="relative w-full">
@@ -103,19 +56,17 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           className="input input-bordered w-full shadow-sm focus:ring-2 focus:ring-accent focus:border-accent transition-all duration-200"
           type="text"
           autoComplete="off"
-          value={autocompleteInput}
-          onChange={handleInputChange}
-          onFocus={() => setIsFocused(true)}
-          placeholder={isApiReady ? "Enter a location" : "Loading maps…"}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={isApiReady ? 'Enter a location' : 'Loading maps\u2026'}
           disabled={!isApiReady}
           aria-label="Location search"
         />
-        {autocompleteInput && (
+        {inputValue && (
           <button
             className="absolute right-0 top-0 h-full px-3 flex items-center justify-center text-gray-400 hover:text-gray-200 min-w-[44px]"
             onClick={() => {
-              setAutocompleteInput('');
-              setPredictions([]);
+              setInputValue('');
               inputRef.current?.focus();
             }}
             aria-label="Clear input"
@@ -124,27 +75,6 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           </button>
         )}
       </div>
-
-      {predictions.length > 0 && (
-        <div
-          ref={predictionsRef}
-          className="absolute z-10 mt-1 w-full bg-base-100 shadow-lg rounded-md border border-base-300 max-h-60 overflow-y-auto"
-        >
-          {predictions.map((prediction) => (
-            <button
-              key={prediction.place_id}
-              className="w-full text-left py-3 px-4 cursor-pointer hover:bg-base-200 active:bg-base-300 text-sm border-b border-base-200 last:border-b-0 min-h-[44px]"
-              onMouseDown={(e) => {
-                // Prevent the input from losing focus so predictions stay visible until onClick fires
-                e.preventDefault();
-              }}
-              onClick={() => handleSelectSuggestion(prediction)}
-            >
-              {prediction.description}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
