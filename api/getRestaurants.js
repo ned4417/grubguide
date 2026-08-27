@@ -131,7 +131,7 @@ export default async function handler(req, res) {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Goog-Api-Key': apiKey,
-                    'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos'
+                    'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos,places.currentOpeningHours'
                 },
                 body: JSON.stringify({
                     textQuery: `restaurants near ${address}`,
@@ -170,7 +170,12 @@ export default async function handler(req, res) {
                     lng: place.location?.longitude || 0
                 }
             },
-            photos: place.photos || []
+            photos: place.photos || [],
+            opening_hours: place.currentOpeningHours ? {
+                open_now: place.currentOpeningHours.openNow,
+                periods: place.currentOpeningHours.periods || [],
+                weekday_text: place.currentOpeningHours.weekdayDescriptions || [],
+            } : null,
         })) || [];
 
         const convertedData = { results };

@@ -86,8 +86,19 @@ function RestaurantCard({
         )}
       </div>
 
-      {/* Address */}
-      <p className="text-sm text-base-content/35 mb-4 break-words">{restaurant.formatted_address}</p>
+      {/* Address + open status */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <p className="text-sm text-base-content/35 break-words">{restaurant.formatted_address}</p>
+        {restaurant.opening_hours && (
+          <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+            restaurant.opening_hours.open_now
+              ? 'bg-emerald-500/15 text-emerald-400'
+              : 'bg-red-500/15 text-red-400'
+          }`}>
+            {restaurant.opening_hours.open_now ? 'Open now' : 'Closed'}
+          </span>
+        )}
+      </div>
 
       {/* AI vibe description */}
       {vibeLoading && (
