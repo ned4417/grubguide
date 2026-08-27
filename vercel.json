@@ -2,8 +2,5 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": null,
-  "outputDirectory": "dist",
-  "engines": {
-    "node": "24.x"
-  }
+  "outputDirectory": "dist"
 }
