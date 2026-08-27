@@ -4,7 +4,7 @@
   "description": "Stop overthinking dinner. We'll pick.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1d1d1f",
+  "background_color": "#f97316",
   "theme_color": "#f97316",
   "orientation": "portrait-primary",
   "icons": [
@@ -12,12 +12,12 @@
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     },
     {
-      "src": "/grubguide_logo_bg-removebg-preview.png",
+      "src": "/icon.svg",
       "sizes": "any",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]
