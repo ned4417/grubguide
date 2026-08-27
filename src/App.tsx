@@ -350,7 +350,7 @@ const App: React.FC = () => {
           <img
             src="/grubguide_logo_bg-removebg-preview.png"
             alt="Grub Guide"
-            className="w-[160px] sm:w-[200px] mb-5"
+            className="w-[220px] sm:w-[280px] mb-5"
           />
           <p className="text-2xl sm:text-3xl font-semibold leading-snug text-base-content/80 max-w-xs">
             Stop overthinking dinner.
