@@ -259,7 +259,7 @@ const App: React.FC = () => {
       <button
         className="w-full py-3.5 rounded-xl font-semibold text-base transition-all duration-150
           bg-orange-500 hover:bg-orange-400 active:scale-[0.98] text-white
-          disabled:bg-base-content/8 disabled:text-base-content/25 disabled:cursor-not-allowed"
+          disabled:opacity-40 disabled:cursor-not-allowed"
         onClick={handleFind}
         disabled={!hasAddress || loading}
       >
@@ -300,7 +300,7 @@ const App: React.FC = () => {
           <img
             src="/grubguide_logo_bg-removebg-preview.png"
             alt="Grub Guide"
-            className="w-[120px] sm:w-[140px] mb-5"
+            className="w-[160px] sm:w-[200px] mb-5"
           />
           <p className="text-2xl sm:text-3xl font-semibold leading-snug text-base-content/80 max-w-xs">
             Stop overthinking dinner.
