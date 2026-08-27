@@ -42,11 +42,15 @@ function RestaurantCard({
   mapsUrl,
   price,
   cardRef,
+  vibeDescription,
+  vibeLoading,
 }: {
   restaurant: any;
   mapsUrl: string | null;
   price: string | null;
   cardRef?: React.RefObject<HTMLDivElement>;
+  vibeDescription?: string | null;
+  vibeLoading?: boolean;
 }) {
   return (
     <div ref={cardRef}>
@@ -83,7 +87,20 @@ function RestaurantCard({
       </div>
 
       {/* Address */}
-      <p className="text-sm text-base-content/35 mb-5 break-words">{restaurant.formatted_address}</p>
+      <p className="text-sm text-base-content/35 mb-4 break-words">{restaurant.formatted_address}</p>
+
+      {/* AI vibe description */}
+      {vibeLoading && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="loading loading-dots loading-xs" style={{ color: '#f97316' }} />
+          <span className="text-xs text-base-content/30">Getting the vibe…</span>
+        </div>
+      )}
+      {!vibeLoading && vibeDescription && (
+        <p className="text-sm text-base-content/60 leading-relaxed mb-5 italic border-l-2 border-orange-500/40 pl-3">
+          {vibeDescription}
+        </p>
+      )}
 
       {/* Links */}
       {mapsUrl && (
@@ -119,10 +136,29 @@ const App: React.FC = () => {
   const [locError, setLocError]               = useState<string | null>(null);
   const [fetchError, setFetchError]           = useState<string | null>(null);
   const [photos, setPhotos]                   = useState<string[]>(DEFAULT_PHOTOS);
+  const [vibeDescription, setVibeDescription] = useState<string | null>(null);
+  const [vibeLoading, setVibeLoading]         = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setPhotos(restaurant?.photos?.length ? restaurant.photos : DEFAULT_PHOTOS);
+  }, [restaurant]);
+
+  // Fetch AI vibe description whenever a new restaurant loads
+  useEffect(() => {
+    if (!restaurant) { setVibeDescription(null); return; }
+    setVibeLoading(true);
+    setVibeDescription(null);
+    axios.post('/api/getVibeDescription', {
+      name: restaurant.name,
+      address: restaurant.formatted_address,
+      rating: restaurant.rating,
+      priceLevel: restaurant.price_level,
+      distance: restaurant.distance,
+    })
+      .then(r => setVibeDescription(r.data.description || null))
+      .catch(() => setVibeDescription(null))
+      .finally(() => setVibeLoading(false));
   }, [restaurant]);
 
   // On mobile, scroll the result into view after it appears below the carousel
@@ -327,6 +363,8 @@ const App: React.FC = () => {
                 restaurant={restaurant}
                 mapsUrl={mapsUrl}
                 price={price}
+                vibeDescription={vibeDescription}
+                vibeLoading={vibeLoading}
               />
             ) : null}
           </div>
@@ -363,6 +401,8 @@ const App: React.FC = () => {
             mapsUrl={mapsUrl}
             price={price}
             cardRef={cardRef}
+            vibeDescription={vibeDescription}
+            vibeLoading={vibeLoading}
           />
         ) : null}
       </div>

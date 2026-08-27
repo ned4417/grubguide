@@ -13,6 +13,7 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
     "@types/googlemaps": "^3.43.3",
     "axios": "^1.6.8",
     "lru-cache": "^11.0.2",
