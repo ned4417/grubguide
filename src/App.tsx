@@ -90,12 +90,15 @@ function RestaurantCard({
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <p className="text-sm text-base-content/35 break-words">{restaurant.formatted_address}</p>
         {restaurant.opening_hours && (
-          <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+          <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
             restaurant.opening_hours.open_now
               ? 'bg-emerald-500/15 text-emerald-400'
               : 'bg-red-500/15 text-red-400'
           }`}>
-            {restaurant.opening_hours.open_now ? 'Open now' : 'Closed'}
+            {restaurant.opening_hours.open_now
+              ? `Open${restaurant.opening_hours.closes_at ? ` · Closes ${restaurant.opening_hours.closes_at}` : ''}`
+              : `Closed${restaurant.opening_hours.opens_at ? ` · Opens ${restaurant.opening_hours.opens_at}` : ''}`
+            }
           </span>
         )}
       </div>

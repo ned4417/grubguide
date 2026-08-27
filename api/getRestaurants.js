@@ -9,6 +9,22 @@ const cache = new LRUCache({
 // Track shown restaurants for each address+radius combination
 const shownRestaurantsMap = new Map();
 
+// Format an RFC3339 timestamp's local time portion as "10 PM" or "10:30 PM"
+const formatLocalTime = (isoString) => {
+    if (!isoString) return null;
+    try {
+        const match = isoString.match(/T(\d{2}):(\d{2}):/);
+        if (!match) return null;
+        let hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        return minutes > 0
+            ? `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`
+            : `${hours} ${ampm}`;
+    } catch { return null; }
+};
+
 // Function to convert miles to meters
 const milesToMeters = (miles) => {
     return miles * 1609;
@@ -173,8 +189,8 @@ export default async function handler(req, res) {
             photos: place.photos || [],
             opening_hours: place.currentOpeningHours ? {
                 open_now: place.currentOpeningHours.openNow,
-                periods: place.currentOpeningHours.periods || [],
-                weekday_text: place.currentOpeningHours.weekdayDescriptions || [],
+                closes_at: formatLocalTime(place.currentOpeningHours.nextCloseTime),
+                opens_at: formatLocalTime(place.currentOpeningHours.nextOpenTime),
             } : null,
         })) || [];
 
