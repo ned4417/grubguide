@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Display font ───────────────────────────────────────────────────────── */
+.font-display {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
 /* ── Carousel ───────────────────────────────────────────────────────────── */
 
 /* Fade-in when a new image mounts */
