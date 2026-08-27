@@ -10,5 +10,12 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Google Maps JS API — loaded after the app bundle so it doesn't block render.
+         %VITE_GOOGLE_API_KEY% is replaced at build time by Vite. -->
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=%VITE_GOOGLE_API_KEY%&libraries=places&loading=async"
+      async
+      defer
+    ></script>
   </body>
 </html>

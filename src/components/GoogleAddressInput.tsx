@@ -6,13 +6,18 @@ interface GoogleAddressAutocompleteProps {
   radius?: string;
 }
 
+interface Prediction {
+  description: string;
+  placeId: string;
+}
+
 const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ onSelect, setSelectedAddress }) => {
   const [autocompleteInput, setAutocompleteInput] = useState('');
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
-  const [isFocused, setIsFocused] = useState(false);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isApiReady, setIsApiReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const predictionsRef = useRef<HTMLDivElement>(null);
+  const sessionTokenRef = useRef<any>(null);
 
   // Poll until google.maps.places is available (script loads async)
   useEffect(() => {
@@ -54,44 +59,57 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
     };
   }, []);
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setAutocompleteInput(value);
 
-    if (!value) {
+    if (!value || !isApiReady) {
       setPredictions([]);
       return;
     }
 
-    if (!isApiReady) {
-      console.error('Google Maps Places API is not ready yet.');
-      return;
-    }
-
     try {
-      const autocompleteService = new google.maps.places.AutocompleteService();
-      autocompleteService.getPlacePredictions({ input: value }, (results, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          setPredictions(results);
-        } else {
-          setPredictions([]);
-          if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-            console.error('Places autocomplete failed:', status);
-          }
+      const places = (google.maps as any).places;
+
+      if (places.AutocompleteSuggestion) {
+        // New Places API (recommended as of March 2025)
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new places.AutocompleteSessionToken();
         }
-      });
+        const { suggestions } = await places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: value,
+          sessionToken: sessionTokenRef.current,
+        });
+        setPredictions(
+          suggestions.map((s: any) => ({
+            description: s.placePrediction.text.toString(),
+            placeId: s.placePrediction.placeId,
+          }))
+        );
+      } else {
+        // Fallback: legacy AutocompleteService
+        const service = new google.maps.places.AutocompleteService();
+        service.getPlacePredictions({ input: value }, (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            setPredictions(results.map(r => ({ description: r.description, placeId: r.place_id })));
+          } else {
+            setPredictions([]);
+          }
+        });
+      }
     } catch (err) {
-      console.error('AutocompleteService error:', err);
+      console.error('Autocomplete error:', err);
+      setPredictions([]);
     }
   };
 
-  // Handle the selection of a suggestion
-  const handleSelectSuggestion = (suggestion: google.maps.places.AutocompletePrediction) => {
-    setAutocompleteInput(suggestion.description);
-    setSelectedAddress(suggestion.description);
-    onSelect(suggestion);
+  const handleSelectSuggestion = (description: string, placeId: string) => {
+    setAutocompleteInput(description);
+    setSelectedAddress(description);
+    // Reset session token after selection (billing best practice)
+    sessionTokenRef.current = null;
     setPredictions([]);
-    setIsFocused(false);
+    onSelect({ description, place_id: placeId } as google.maps.places.AutocompletePrediction);
   };
 
   return (
@@ -104,10 +122,11 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
           autoComplete="off"
           value={autocompleteInput}
           onChange={handleInputChange}
-          onFocus={() => setIsFocused(true)}
-          placeholder={isApiReady ? "Enter a location" : "Loading maps…"}
+          placeholder={isApiReady ? 'Enter a location' : 'Loading maps…'}
           disabled={!isApiReady}
           aria-label="Location search"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
         />
         {autocompleteInput && (
           <button
@@ -115,6 +134,7 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
             onClick={() => {
               setAutocompleteInput('');
               setPredictions([]);
+              sessionTokenRef.current = null;
               inputRef.current?.focus();
             }}
             aria-label="Clear input"
@@ -127,19 +147,18 @@ const GoogleAddressAutocomplete: React.FC<GoogleAddressAutocompleteProps> = ({ o
       {predictions.length > 0 && (
         <div
           ref={predictionsRef}
+          role="listbox"
           className="absolute z-10 mt-1 w-full bg-base-100 shadow-lg rounded-md border border-base-300 max-h-60 overflow-y-auto"
         >
-          {predictions.map((prediction) => (
+          {predictions.map((p) => (
             <button
-              key={prediction.place_id}
+              key={p.placeId}
+              role="option"
               className="w-full text-left py-3 px-4 cursor-pointer hover:bg-base-200 active:bg-base-300 text-sm border-b border-base-200 last:border-b-0 min-h-[44px]"
-              onMouseDown={(e) => {
-                // Prevent the input from losing focus so predictions stay visible until onClick fires
-                e.preventDefault();
-              }}
-              onClick={() => handleSelectSuggestion(prediction)}
+              onMouseDown={(e) => e.preventDefault()} // keep input focused
+              onClick={() => handleSelectSuggestion(p.description, p.placeId)}
             >
-              {prediction.description}
+              {p.description}
             </button>
           ))}
         </div>
