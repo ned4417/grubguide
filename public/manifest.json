@@ -1,0 +1,18 @@
+{
+  "name": "Grub Guide",
+  "short_name": "Grub Guide",
+  "description": "Stop overthinking dinner. We'll pick.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1d1d1f",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/grubguide_logo_bg-removebg-preview.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
