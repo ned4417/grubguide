@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Orange background -->
+  <rect width="512" height="512" fill="#f97316"/>
+  <!-- White fork icon, centered within maskable safe zone -->
+  <g fill="white">
+    <!-- 3 tines -->
+    <rect x="210" y="108" width="14" height="105" rx="7"/>
+    <rect x="249" y="108" width="14" height="105" rx="7"/>
+    <rect x="288" y="108" width="14" height="105" rx="7"/>
+    <!-- Neck: trapezoid converging tines into handle -->
+    <path d="M210 206 L302 206 L270 244 L242 244 Z"/>
+    <!-- Handle -->
+    <rect x="242" y="240" width="28" height="166" rx="14"/>
+  </g>
+</svg>
