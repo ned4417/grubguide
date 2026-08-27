@@ -204,7 +204,7 @@ const App: React.FC = () => {
 
   const price   = restaurant?.price_level ? PRICE_MAP[restaurant.price_level] : null;
   const mapsUrl = restaurant?.place_id
-    ? `https://www.google.com/maps/place/?q=place_id:${restaurant.place_id}`
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name)}&query_place_id=${restaurant.place_id}`
     : null;
   const hasAddress = selectedAddress.trim().length > 0;
 
