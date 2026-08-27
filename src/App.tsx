@@ -1,266 +1,349 @@
 import { useState, useEffect, useRef } from 'react';
-import { useMediaQuery } from 'react-responsive';
 import GoogleAddressAutocomplete from './components/GoogleAddressInput';
 import axios from 'axios';
 import ImageCarousel from './components/Carousel';
 import "react-multi-carousel/lib/styles.css";
 
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+const PRICE_MAP: Record<number, string> = { 0: 'Free', 1: '$', 2: '$$', 3: '$$$', 4: '$$$$' };
+
+const DEFAULT_PHOTOS = [
+  '/breakfast.jpg', '/burger.jpg', '/dessert.jpg',
+  '/fancy.jpg', '/tacos.jpg', '/pizza.jpg', '/sushi.jpg', '/pasta.jpg',
+];
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <span className="text-yellow-400 tracking-tight text-base" aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map(i => {
+        const filled = i <= Math.floor(rating);
+        const half   = !filled && i === Math.ceil(rating) && rating % 1 >= 0.5;
+        return (
+          <span key={i} className={filled ? 'opacity-100' : half ? 'opacity-50' : 'opacity-20'}>★</span>
+        );
+      })}
+    </span>
+  );
+}
+
+async function shareRestaurant(name: string, address: string, mapsUrl: string) {
+  const data = { title: name, text: `Check out ${name} — ${address}`, url: mapsUrl };
+  if (navigator.share && navigator.canShare?.(data)) {
+    try { await navigator.share(data); return; } catch { /* cancelled */ }
+  }
+  // Fallback: copy link
+  try {
+    await navigator.clipboard.writeText(`${name}\n${address}\n${mapsUrl}`);
+    alert('Copied to clipboard!');
+  } catch {
+    alert(mapsUrl);
+  }
+}
+
+// ─── component ──────────────────────────────────────────────────────────────
+
 const App: React.FC = () => {
-  const [randomRestaurant, setRandomRestaurant] = useState<any>(null);
-  const [selectedAddress, setSelectedAddress] = useState<string>('');
-  const [selectedDistance, setSelectedDistance] = useState<string>('10');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isGettingLocation, setIsGettingLocation] = useState<boolean>(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const restaurantCardRef = useRef<HTMLDivElement>(null);
-  const [currentPhotos, setCurrentPhotos] = useState<string[]>([
-    '/breakfast.jpg',
-    '/burger.jpg',
-    '/dessert.jpg',
-    '/fancy.jpg',
-    '/tacos.jpg',
-    '/pizza.jpg',
-    '/sushi.jpg',
-    '/pasta.jpg'
-  ]);
-  const [searchLabelText, setSearchLabelText] = useState("Search Radius from Address to search: ");
-  const [distanceLabelText, setDistanceLabelText] = useState("Distance from selected address: ");
-  const isSmallScreen = useMediaQuery({ maxWidth: 640 });
+  const [restaurant, setRestaurant]       = useState<any>(null);
+  const [selectedAddress, setSelectedAddress] = useState('');
+  const [radius, setRadius]               = useState('10');
+  const [loading, setLoading]             = useState(false);
+  const [locating, setLocating]           = useState(false);
+  const [locError, setLocError]           = useState<string | null>(null);
+  const [fetchError, setFetchError]       = useState<string | null>(null);
+  const [photos, setPhotos]               = useState<string[]>(DEFAULT_PHOTOS);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  // Update label texts based on screen size
   useEffect(() => {
-    if (isSmallScreen) {
-      setSearchLabelText("Search Radius: ");
-      setDistanceLabelText("Distance: ");
-    } else {
-      setSearchLabelText("Search Radius from Address to search: ");
-      setDistanceLabelText("Distance from selected address: ");
-    }
-  }, [isSmallScreen]);
+    setPhotos(restaurant?.photos?.length ? restaurant.photos : DEFAULT_PHOTOS);
+  }, [restaurant]);
 
-  // Update photos when restaurant changes
   useEffect(() => {
-    if (randomRestaurant && randomRestaurant.photos) {
-      setCurrentPhotos(randomRestaurant.photos);
+    if (restaurant && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [randomRestaurant]);
+  }, [restaurant]);
 
-  // Scroll restaurant card into view when a result loads
-  useEffect(() => {
-    if (randomRestaurant && restaurantCardRef.current) {
-      restaurantCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [randomRestaurant]);
+  // ── fetch ──────────────────────────────────────────────────────────────────
 
-  // Function to fetch and set random restaurant data
-  const fetchRandomRestaurant = (address: string, radius: string, isReroll: boolean = false, previousId?: string) => {
-    setIsLoading(true);
-    setRandomRestaurant(null);
+  const fetchRestaurant = (address: string, rad: string, reroll = false, previousId?: string) => {
+    setLoading(true);
+    setFetchError(null);
 
-    let url = `/api/getRestaurants?address=${encodeURIComponent(address)}&radius=${radius}`;
-
-    // Add reroll and previousId parameters if this is a reroll
-    if (isReroll) {
-      url += `&reroll=true`;
-      if (previousId) {
-        url += `&previousId=${previousId}`;
-      }
+    let url = `/api/getRestaurants?address=${encodeURIComponent(address)}&radius=${rad}`;
+    if (reroll) {
+      url += '&reroll=true';
+      if (previousId) url += `&previousId=${previousId}`;
     }
 
     axios.get(url)
-      .then(response => {
-        setRandomRestaurant(response.data);
-        setIsLoading(false);
+      .then(r  => setRestaurant(r.data))
+      .catch(e => {
+        setRestaurant(null);
+        setFetchError(e.response?.data?.error || 'Could not find restaurants. Try a different location or larger radius.');
       })
-      .catch(error => {
-        console.error('Error fetching restaurant:', error);
-        setIsLoading(false);
-      });
+      .finally(() => setLoading(false));
   };
 
-  // Function to handle getting the user's current location
-  const handleGetCurrentLocation = () => {
-    setIsGettingLocation(true);
-    setLocationError(null);
+  const handleSelectPlace = (place: google.maps.places.AutocompletePrediction) => {
+    setSelectedAddress(place.description);
+    fetchRestaurant(place.description, radius);
+  };
+
+  const rollAgain = () => {
+    fetchRestaurant(selectedAddress, radius, true, restaurant?.place_id);
+  };
+
+  const handleLocate = () => {
+    setLocating(true);
+    setLocError(null);
 
     if (!navigator.geolocation) {
-      setLocationError("Geolocation is not supported by your browser");
-      setIsGettingLocation(false);
+      setLocError('Geolocation not supported by your browser');
+      setLocating(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      async ({ coords }) => {
         try {
-          const response = await axios.get(
-            `/api/reverseGeocode?lat=${position.coords.latitude}&lng=${position.coords.longitude}`
-          );
-
-          if (response.data && response.data.address) {
-            const address = response.data.address;
-            setSelectedAddress(address);
-            fetchRandomRestaurant(address, selectedDistance);
+          const res = await axios.get(`/api/reverseGeocode?lat=${coords.latitude}&lng=${coords.longitude}`);
+          if (res.data?.address) {
+            const addr = res.data.address;
+            setSelectedAddress(addr);
+            fetchRestaurant(addr, radius);
           } else {
-            setLocationError("Could not determine your address");
+            setLocError('Could not determine your address');
           }
-        } catch (error) {
-          console.error("Error reverse geocoding:", error);
-          setLocationError("Error determining your location");
+        } catch {
+          setLocError('Error determining your location');
         } finally {
-          setIsGettingLocation(false);
+          setLocating(false);
         }
       },
-      (error) => {
-        console.error("Geolocation error:", error);
-        setLocationError(
-          error.code === 1
-            ? "Location access denied. Please enable location services."
-            : "Error getting your location"
-        );
-        setIsGettingLocation(false);
+      (err) => {
+        setLocError(err.code === 1 ? 'Location access denied. Please enable location services.' : 'Error getting your location');
+        setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const handleSelectPlace = (place: google.maps.places.AutocompletePrediction) => {
-    setSelectedAddress(place.description);
-    fetchRandomRestaurant(place.description, selectedDistance);
-  };
+  // ── derived values ─────────────────────────────────────────────────────────
 
-  // Function to choose another restaurant
-  const chooseAnotherRestaurant = () => {
-    const previousId = randomRestaurant?.place_id;
-    setRandomRestaurant(null);
-    fetchRandomRestaurant(selectedAddress, selectedDistance, true, previousId);
-  };
+  const price   = restaurant?.price_level != null ? PRICE_MAP[restaurant.price_level] : null;
+  const mapsUrl = restaurant?.place_id
+    ? `https://www.google.com/maps/place/?q=place_id:${restaurant.place_id}`
+    : null;
 
-  const handleSliderOnChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedDistance(event.target.value);
-  }
+  // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <main data-theme="dark" className="flex min-h-screen flex-col items-center py-6 px-4 sm:px-8 md:px-12 lg:px-16 gap-6">
-      {/* Header with logo */}
-      <div className="z-10 w-full max-w-5xl flex items-center justify-center font-mono text-sm">
+    <main data-theme="dark" className="min-h-screen flex flex-col items-center px-4 sm:px-6 pb-16">
+
+      {/* ── Logo ──────────────────────────────────────────────────────────── */}
+      <header className="w-full flex flex-col items-center pt-8 pb-2">
         <img
           src="/grubguide_logo_bg-removebg-preview.png"
-          alt="Grub Guide Logo"
-          className="w-full max-w-[180px] sm:max-w-xs md:max-w-md mx-auto"
+          alt="Grub Guide"
+          className="w-[140px] sm:w-[180px] md:w-[220px]"
         />
-      </div>
+        <p className="text-xs sm:text-sm text-base-content/50 mt-1 tracking-wide">
+          Let fate pick your next meal
+        </p>
+      </header>
 
-      {/* Search section */}
-      <div className="w-full max-w-xl px-2 space-y-4">
-        <div className="w-full">
-          <label className="label text-sm font-medium mb-1">Enter an address or use your location</label>
-          <div className="flex w-full gap-2 items-start">
-            <div className="flex-grow">
-              <GoogleAddressAutocomplete
-                onSelect={handleSelectPlace}
-                setSelectedAddress={setSelectedAddress}
-                radius={selectedDistance}
-              />
-            </div>
-            <div className="flex flex-col items-center gap-0.5 shrink-0">
+      {/* ── Search card ───────────────────────────────────────────────────── */}
+      <section className="w-full max-w-xl mt-5">
+        <div className="bg-base-200/60 border border-base-300/30 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-sm space-y-5">
+
+          {/* Address + locate */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-base-content/50 uppercase tracking-widest">
+              Your location
+            </label>
+            <div className="flex gap-2 items-start">
+              <div className="flex-1">
+                <GoogleAddressAutocomplete
+                  onSelect={handleSelectPlace}
+                  setSelectedAddress={setSelectedAddress}
+                  radius={radius}
+                />
+              </div>
               <button
-                className="btn btn-outline border-2 border-accent hover:bg-accent/20"
-                onClick={handleGetCurrentLocation}
-                disabled={isGettingLocation}
+                className="btn btn-outline border-2 border-accent/60 hover:bg-accent/10 hover:border-accent shrink-0 h-12"
+                onClick={handleLocate}
+                disabled={locating}
                 aria-label="Use my current location"
               >
-                {isGettingLocation ? (
-                  <span className="loading loading-spinner loading-sm"></span>
+                {locating ? (
+                  <span className="loading loading-spinner loading-sm" />
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-accent" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                   </svg>
                 )}
               </button>
-              <span className="text-[10px] text-accent/80 leading-none sm:hidden">My location</span>
+            </div>
+            {locError && (
+              <p className="text-error text-xs flex gap-1 items-start">
+                <span className="shrink-0 mt-px">⚠</span>
+                <span>{locError}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Radius slider */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-medium text-base-content/50 uppercase tracking-widest">
+                Search radius
+              </label>
+              <span className="text-sm font-bold text-accent">{radius} mi</span>
+            </div>
+            <input
+              type="range"
+              min={5}
+              max={30}
+              value={radius}
+              className="range range-accent range-sm w-full"
+              onChange={e => setRadius(e.target.value)}
+            />
+            <div className="flex justify-between text-xs text-base-content/30 px-0.5">
+              <span>5 mi</span>
+              <span>30 mi</span>
             </div>
           </div>
+
         </div>
+      </section>
 
-        {locationError && (
-          <div className="flex items-center gap-2 text-error text-sm mt-1">
-            <span>{locationError}</span>
-            <button
-              className="btn btn-xs btn-ghost text-error underline"
-              onClick={handleGetCurrentLocation}
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        <div className="w-full">
-          <label className="label text-sm md:text-base">
-            {searchLabelText} <span className="font-medium">{selectedDistance} mi</span>
-          </label>
-          <input
-            type="range"
-            min={5}
-            max="30"
-            value={selectedDistance}
-            className="range range-accent w-full"
-            onChange={handleSliderOnChange}
-          />
-          <div className="w-full flex justify-between text-xs px-1 mt-1">
-            <span>5 mi</span>
-            <span>30 mi</span>
-          </div>
+      {/* ── Photo carousel ────────────────────────────────────────────────── */}
+      <section className="w-full max-w-4xl mt-6">
+        <div className="w-full aspect-[4/3] sm:aspect-[16/9] max-h-[48vh] sm:max-h-[480px] rounded-2xl overflow-hidden shadow-2xl">
+          <ImageCarousel photos={photos} />
         </div>
-      </div>
+      </section>
 
-      {/* Restaurant details section */}
-      <div className="w-full max-w-2xl">
-        {isLoading ? (
-          <div className="p-6 text-center">
-            <div className="flex flex-col items-center justify-center">
-              <div className="loading loading-spinner loading-lg text-accent mb-3"></div>
-              <p className="text-base md:text-lg animate-pulse">Finding the perfect spot for you...</p>
+      {/* ── Restaurant info card ──────────────────────────────────────────── */}
+      <section className="w-full max-w-4xl mt-4 min-h-[80px]">
+        {loading ? (
+          <div className="flex items-center justify-center gap-3 py-8 text-base-content/60">
+            <span className="loading loading-spinner loading-md text-accent" />
+            <span className="text-sm animate-pulse">Finding the perfect spot…</span>
+          </div>
+
+        ) : fetchError ? (
+          <div className="flex items-start gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-3 text-sm text-error">
+            <span className="shrink-0 mt-0.5">⚠</span>
+            <span>{fetchError}</span>
+          </div>
+
+        ) : restaurant ? (
+          <div
+            ref={cardRef}
+            className="bg-base-200/60 border border-base-300/30 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-sm"
+          >
+            {/* Name */}
+            <h2 className="text-2xl sm:text-3xl font-bold break-words leading-tight mb-2">
+              {restaurant.name}
+            </h2>
+
+            {/* Rating · Price · Distance */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-3">
+              {restaurant.rating > 0 && (
+                <>
+                  <StarRating rating={restaurant.rating} />
+                  <span className="text-sm font-semibold">{restaurant.rating.toFixed(1)}</span>
+                  {restaurant.user_ratings_total > 0 && (
+                    <span className="text-xs text-base-content/40">
+                      ({restaurant.user_ratings_total.toLocaleString()} reviews)
+                    </span>
+                  )}
+                </>
+              )}
+
+              {price && (
+                <>
+                  {restaurant.rating > 0 && <span className="text-base-content/25 mx-1">·</span>}
+                  <span className="text-sm font-semibold text-accent">{price}</span>
+                </>
+              )}
+
+              {restaurant.distance && restaurant.distance !== 'N/A' && (
+                <>
+                  <span className="text-base-content/25 mx-1">·</span>
+                  <span className="text-xs text-base-content/50">
+                    📍 {restaurant.distance} away
+                  </span>
+                </>
+              )}
             </div>
-          </div>
-        ) : randomRestaurant ? (
-          <div ref={restaurantCardRef} className="p-3 sm:p-4 md:p-6 text-center bg-base-200 rounded-lg shadow-md animate-fade-in">
-            <h2 className="text-xl sm:text-2xl md:text-3xl mb-2 font-bold break-words">{randomRestaurant.name}</h2>
-            <p className="text-sm sm:text-base md:text-lg mb-1 break-words">{randomRestaurant.formatted_address}</p>
-            <p className="text-xs sm:text-sm md:text-base pt-2 opacity-80">
-              {distanceLabelText} <span className="font-medium">{randomRestaurant.distance}</span>
+
+            {/* Address */}
+            <p className="text-sm text-base-content/55 break-words mb-4">
+              {restaurant.formatted_address}
             </p>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-2">
+              {mapsUrl && (
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-sm btn-outline border-base-content/20 hover:border-accent hover:text-accent gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                  </svg>
+                  Open in Maps
+                </a>
+              )}
+
+              {mapsUrl && (
+                <button
+                  className="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 hover:border-accent/40"
+                  onClick={() => shareRestaurant(restaurant.name, restaurant.formatted_address, mapsUrl)}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Share
+                </button>
+              )}
+            </div>
           </div>
-        ) : selectedAddress && !isLoading ? (
-          <div className="p-3 text-center opacity-70">
-            <p>Select a location to find restaurants</p>
+        ) : selectedAddress && !loading ? (
+          <div className="text-center text-sm text-base-content/30 py-6">
+            Searching for restaurants…
           </div>
         ) : null}
-      </div>
+      </section>
 
-      {/* Carousel section */}
-      <div className="w-full max-w-4xl mx-auto aspect-[4/3] lg:aspect-[16/9] max-h-[45vh] lg:max-h-none">
-        <ImageCarousel photos={currentPhotos} />
-      </div>
-
-      {/* Action button section */}
+      {/* ── Roll Again CTA ────────────────────────────────────────────────── */}
       {selectedAddress && (
-        <div className="w-full flex justify-center">
+        <section className="w-full flex justify-center mt-6">
           <button
-            className="btn btn-primary btn-lg shadow-lg"
-            onClick={chooseAnotherRestaurant}
-            disabled={!randomRestaurant || isLoading}
+            className="btn btn-primary btn-lg gap-2 px-8 shadow-lg shadow-primary/20 min-w-[200px]"
+            onClick={rollAgain}
+            disabled={!restaurant || loading}
           >
-            {isLoading ? (
+            {loading ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
+                <span className="loading loading-spinner loading-sm" />
                 Finding a spot…
               </>
             ) : (
-              'Roll the culinary dice again'
+              <>
+                <span className="text-xl">🎲</span>
+                Roll Again
+              </>
             )}
           </button>
-        </div>
+        </section>
       )}
+
     </main>
   );
 };
