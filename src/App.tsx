@@ -206,10 +206,12 @@ const App: React.FC = () => {
 
   const handleSelectPlace = (place: google.maps.places.AutocompletePrediction) => {
     setSelectedAddress(place.description);
+    setLocError(null);
     fetchRestaurant(place.description, radius);
   };
 
   const handleFind = () => {
+    setLocError(null);
     if (restaurant) {
       fetchRestaurant(selectedAddress, radius, true, restaurant.place_id);
     } else {
