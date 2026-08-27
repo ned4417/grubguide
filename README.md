@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Grub Guide
 
-## Getting Started
+**Stop overthinking dinner. We'll pick.**
 
-First, run the development server:
+Grub Guide is a restaurant discovery app that randomly selects a nearby restaurant based on your location and preferred search radius — with an AI-generated vibe description powered by Claude.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+🔗 **Live demo:** [eats-picker.vercel.app](https://eats-picker.vercel.app)
+
+---
+
+## Features
+
+- 🎲 **Random restaurant picker** — enter any address or use your current location
+- 📍 **Adjustable radius** — slide from 5 to 30 miles
+- 🤖 **AI vibe descriptions** — Claude generates a 2-sentence feel for each pick
+- 🕐 **Open now badge** — see at a glance if the restaurant is currently open
+- 📸 **Cinematic photo carousel** — Ken Burns effect, Stories-style progress bars, swipe-to-navigate
+- 🗺️ **One-tap Maps** — deep link opens the restaurant directly in Google Maps
+- 📱 **PWA-ready** — installable on iOS and Android via "Add to Home Screen"
+- ↩️ **Re-roll** — not feeling it? Hit "Try another" for a new pick
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + TypeScript + Vite |
+| Styling | Tailwind CSS + DaisyUI (dark theme) |
+| Address autocomplete | Google Maps JavaScript API (AutocompleteSuggestion) |
+| Restaurant search | Google Places API (New) — Text Search |
+| Reverse geocoding | Google Geocoding API |
+| AI descriptions | Anthropic Claude API (claude-haiku-4-5) |
+| Deployment | Vercel (serverless functions for API routes) |
+
+---
+
+## Project structure
+
+```
+grubguide/
+├── api/                      # Vercel serverless functions
+│   ├── getRestaurants.js     # Places API search + photo URLs
+│   ├── getVibeDescription.js # Claude AI vibe generation
+│   └── reverseGeocode.js     # Lat/lng → address
+├── public/
+│   ├── manifest.json         # PWA manifest
+│   └── *.jpg                 # Default food photos (fallback)
+└── src/
+    ├── components/
+    │   ├── Carousel.tsx       # Ken Burns carousel with touch + keyboard nav
+    │   └── GoogleAddressInput.tsx
+    └── App.tsx                # Main layout + state
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local development
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+### Prerequisites
+- Node.js 18+
+- Google Cloud project with **Maps JavaScript API**, **Places API (New)**, and **Geocoding API** enabled
+- Anthropic API key
 
-## Learn More
+### Setup
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+git clone https://github.com/ned4417/grubguide.git
+cd grubguide
+npm install
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Create a `.env.local` file:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```env
+VITE_GOOGLE_API_KEY=your_browser_key_here
+GOOGLE_SERVER_API_KEY=your_server_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+```
 
-## Deploy on Vercel
+> **Two API keys:** The browser key (`VITE_GOOGLE_API_KEY`) should be HTTP-referrer restricted. The server key (`GOOGLE_SERVER_API_KEY`) is used by Vercel functions and should be IP-restricted or unrestricted.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev          # Vite dev server (frontend only)
+vercel dev           # Full stack including API routes
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+---
+
+## Deployment
+
+Deployed on Vercel. Set the following environment variables in your project settings:
+
+| Variable | Description |
+|---|---|
+| `VITE_GOOGLE_API_KEY` | Google Maps key (browser, HTTP-referrer restricted) |
+| `GOOGLE_SERVER_API_KEY` | Google Maps key (server, for API routes) |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude vibe descriptions |
