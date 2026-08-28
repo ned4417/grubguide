@@ -24,13 +24,6 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-// Reservation search — links to Google so it surfaces whatever platform
-// the restaurant actually uses (OpenTable, Resy, direct booking, etc.)
-// When OpenTable affiliate approval comes through, swap this to their link.
-function buildReservationUrl(restaurantName: string, address: string): string {
-  const query = `${restaurantName} ${address} reservations`;
-  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-}
 
 async function shareRestaurant(name: string, address: string, mapsUrl: string) {
   const data = { title: name, text: `${name} — ${address}`, url: mapsUrl };
@@ -134,14 +127,6 @@ function RestaurantCard({
             className="text-sm text-orange-400 hover:text-orange-300 transition-colors"
           >
             Open in Maps →
-          </a>
-          <a
-            href={buildReservationUrl(restaurant.name, restaurant.formatted_address)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-base-content/50 hover:text-base-content/80 transition-colors"
-          >
-            Find a table
           </a>
           <button
             className="text-sm text-base-content/35 hover:text-base-content/60 transition-colors"
