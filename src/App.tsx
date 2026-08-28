@@ -24,18 +24,12 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-// OpenTable affiliate link builder.
-// Set VITE_OT_AFFILIATE_ID in Vercel env vars once approved via CJ Affiliate.
-// Format: your CJ publisher click URL, e.g. https://www.jdoqocy.com/click-XXXXXXXX-XXXXXXXX
-// Leave unset during development — the plain OpenTable search URL still works.
-const OT_AFFILIATE_BASE = import.meta.env.VITE_OT_AFFILIATE_ID ?? '';
-
-function buildOpenTableUrl(restaurantName: string): string {
-  const searchUrl = `https://www.opentable.com/s/?term=${encodeURIComponent(restaurantName)}&covers=2`;
-  if (OT_AFFILIATE_BASE) {
-    return `${OT_AFFILIATE_BASE}?url=${encodeURIComponent(searchUrl)}`;
-  }
-  return searchUrl;
+// Reservation search — links to Google so it surfaces whatever platform
+// the restaurant actually uses (OpenTable, Resy, direct booking, etc.)
+// When OpenTable affiliate approval comes through, swap this to their link.
+function buildReservationUrl(restaurantName: string, address: string): string {
+  const query = `${restaurantName} ${address} reservations`;
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
 async function shareRestaurant(name: string, address: string, mapsUrl: string) {
@@ -142,12 +136,12 @@ function RestaurantCard({
             Open in Maps →
           </a>
           <a
-            href={buildOpenTableUrl(restaurant.name)}
+            href={buildReservationUrl(restaurant.name, restaurant.formatted_address)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-base-content/50 hover:text-base-content/80 transition-colors"
           >
-            Reserve a table
+            Find a table
           </a>
           <button
             className="text-sm text-base-content/35 hover:text-base-content/60 transition-colors"
